@@ -10,7 +10,9 @@ public class Agent implements MarioAgent {
     private enum State {
         NEUTRAL,
         STOPPED,
-        HANDLE_GOOMBA
+        HANDLE_GOOMBA,
+        HANDLE_GAP,
+        HANDLE_WALL
     }
 
     private State currentState = State.NEUTRAL;
@@ -198,9 +200,8 @@ public class Agent implements MarioAgent {
         for (int dx = 1; dx <= 3; dx++) {
             int tile = scene[centerX + dx][centerY];
             if (tile == MarioForwardModel.OBS_PIPE ||
-                tile == MarioForwardModel.OBS_SOLID ||
-                tile == MarioForwardModel.OBS_QUESTION_BLOCK) {
-                return State.STOPPED;
+                tile == MarioForwardModel.OBS_SOLID) { 
+                return State.STOPPED; // change this <---
             }
         }
 
