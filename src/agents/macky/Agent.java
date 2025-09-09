@@ -6,129 +6,173 @@ import engine.core.MarioTimer;
 import java.util.Random;
 
 public class Agent implements MarioAgent {
+    // Jump state for walls/gaps
+    private enum JumpType {
+        ENEMY, GAP, WALL, NONE
+    }
+    private JumpType jumpType = JumpType.NONE;
+    private int jumpCount = 0, jumpSize = -1;
+    private boolean[] action;
 
     private enum State {
-        NEUTRAL,
-        STOPPED,
-        HANDLE_GOOMBA,
-        HANDLE_GAP,
-        HANDLE_WALL
+        NEUTRAL, STOPPED, HANDLE_ENEMY, HANDLE_WALL, HANDLE_GAP
     }
 
-    private State currentState = State.NEUTRAL;
-    private long neutralStartTime;
-    private boolean isRunning = false;
+    private State currentState;
     private Random random = new Random();
-    
-    private int goombaBehavior = -1;
-    private long goombaStartTime;
-    private boolean goombaJumped = false;
+
+    private int enemyBehavior = -1;
+    private long enemyStartTime;
+    private boolean enemyJumped, enemyJumpTriggered = false;
     private int retreatDuration = 0;
-    private boolean goombaJumpTriggered = false;
     private long postJumpStartTime;
 
     @Override
     public void initialize(MarioForwardModel model, MarioTimer timer) {
         currentState = State.NEUTRAL;
-        neutralStartTime = System.currentTimeMillis();
-        isRunning = false;
+        action = new boolean[5];
+        action[1] = true; // right
+        action[3] = true; // speed/run
+        jumpType = JumpType.NONE;
+        jumpCount = 0;
+        jumpSize = -1;
     }
 
     @Override
     public boolean[] getActions(MarioForwardModel model, MarioTimer timer) {
         switch (currentState) {
-            case NEUTRAL:
-                return handleNeutralState(model, timer);
-            case STOPPED:
-                return new boolean[]{true, false, false, true, true};
-            case HANDLE_GOOMBA:
-                return handleGoombaState(model, timer);
+            case HANDLE_ENEMY:
+                return handleEnemyState(model, timer);
             default:
-                return new boolean[5];
+                return handlePlatformerActions(model, timer);
         }
     }
 
-    private boolean[] handleNeutralState(MarioForwardModel model, MarioTimer timer) {
-        long elapsed = System.currentTimeMillis() - neutralStartTime;
-
-        if (!isRunning && elapsed > 400 + random.nextInt(600)) {
-            isRunning = true;
-        }
-
-        State obstacleState = detectObstacle(model);
-        if (obstacleState == State.HANDLE_GOOMBA) { // Change to null
+    // Logic for walls/gaps, inspired by trondEllingsen.Agent
+    private boolean[] handlePlatformerActions(MarioForwardModel model, MarioTimer timer) {
+        // Enemy detection and state switch
+        State obstacleState = this.detectObstacle(model);
+        if (obstacleState == State.HANDLE_ENEMY) {
             currentState = obstacleState;
             return new boolean[5];
         }
 
-        return new boolean[]{
-            false, // left
-            true,  // right
-            false, // down
-            isRunning, // run
-            false  // jump
-        };
-    } 
+        // Wall/gap/jump logic
+        final float marioSpeed = model.getMarioFloatVelocity()[0];
+        final boolean dangerOfGap = dangerOfGap(model);
+        final int[] marioTile = model.getMarioScreenTilePos();
+        final int wallHeight = getWallHeight(marioTile[0], marioTile[1], model.getScreenSceneObservation());
+        final boolean onGround = model.isMarioOnGround();
+        final boolean canJump = model.mayMarioJump();
 
-    private boolean[] handleGoombaState(MarioForwardModel model, MarioTimer timer) {
-        long now = System.currentTimeMillis();
-
-        // Initialize behavior if not set
-        if (goombaBehavior == -1) {
-            goombaBehavior = random.nextInt(3); // 0, 1, or 2
-            goombaStartTime = now;
-            goombaJumped = false;
+        if ((onGround || canJump) && !jumpType.equals(JumpType.NONE)) {
+            jumpType = JumpType.NONE;
+            jumpSize = -1;
+        } else if (canJump) {
+            int jumpError = random.nextInt(4) - 1; // -1, 0, 1, or 2
+            if (dangerOfGap && marioSpeed > 0) {
+                jumpType = JumpType.GAP;
+                jumpSize = (marioSpeed < 6 ? (int) (9 - marioSpeed) : 1) + jumpError;
+                if (jumpSize < 1) jumpSize = 1;
+                jumpCount = 0;
+            } else if (marioSpeed <= 1 && wallHeight > 0) {
+                jumpType = JumpType.WALL;
+                jumpSize = (wallHeight >= 4 ? wallHeight + 3 : wallHeight) + jumpError;
+                if (jumpSize < 1) jumpSize = 1;
+                jumpCount = 0;
+            }
+        } else if (!jumpType.equals(JumpType.NONE)) {
+            jumpCount++;
         }
 
-        long elapsed = now - goombaStartTime;
-        switch (goombaBehavior) {
-            case 0: // Walk + jump on Goomba
-                long elapsedJump = System.currentTimeMillis() - goombaStartTime;
+        // Action array construction
+        boolean[] act = new boolean[5];
+        act[1] = true; // right
+        act[3] = true; // speed/run
+        act[4] = !jumpType.equals(JumpType.NONE) && jumpCount < jumpSize;
+        return act;
+    }
 
-                if (!goombaJumped) {
-                    goombaJumped = true;
-                    goombaStartTime = System.currentTimeMillis();
+    // Helper: wall height calculation
+    private int getWallHeight(int tileX, int tileY, int[][] levelScene) {
+        int y = tileY + 1, wallHeight = 0;
+        while (y-- > 0 && levelScene[tileX + 1][y] != 0) {
+            wallHeight++;
+        }
+        return wallHeight;
+    }
+
+    // Helper: gap detection
+    private boolean dangerOfGap(MarioForwardModel model) {
+        int[] marioTile = model.getMarioScreenTilePos();
+        int[][] levelScene = model.getScreenSceneObservation();
+        for (int y = marioTile[1] + 1; y < levelScene[0].length; y++) {
+            if (levelScene[marioTile[0] + 1][y] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Enemy handling logic with randomized strategies
+    private boolean[] handleEnemyState(MarioForwardModel model, MarioTimer timer) {
+        long now = System.currentTimeMillis();
+
+        // Initialize enemy behavior if not set
+        if (enemyBehavior == -1) {
+            enemyBehavior = random.nextInt(3); // 0, 1, or 2
+            enemyStartTime = now;
+            enemyJumped = false;
+        }
+
+        switch (enemyBehavior) {
+            case 0: // Walk + jump on Enemy
+                long elapsedJump = System.currentTimeMillis() - enemyStartTime;
+
+                if (!enemyJumped) {
+                    enemyJumped = true;
+                    enemyStartTime = System.currentTimeMillis();
                     return new boolean[]{true, false, false, true, true}; // jump left
                 } else if (elapsedJump < 150) {
                     return new boolean[]{true, false, false, true, true}; // keep jumping left
                 } else if (elapsedJump < 320) {
                     return new boolean[]{false, true, false, false, false}; // keep jumping right
                 } else {
-                    resetGoombaState();
+                    resetEnemyState();
                     return new boolean[]{false, true, false, false, false}; // resume walking right
                 }
 
             case 1:
-                long elapsedRetreat = System.currentTimeMillis() - goombaStartTime;
+                long elapsedRetreat = System.currentTimeMillis() - enemyStartTime;
 
-                if (!goombaJumped) {
-                    goombaJumped = true;
-                    goombaStartTime = System.currentTimeMillis();
+                if (!enemyJumped) {
+                    enemyJumped = true;
+                    enemyStartTime = System.currentTimeMillis();
                     retreatDuration = 300; // 300–370ms
                     return new boolean[]{true, false, false, true, false}; // start sprinting back
                 } else if (elapsedRetreat < retreatDuration) {
                     return new boolean[]{true, false, false, true, false}; // keep sprinting back
-                } else if ((isGoombaClose(model) || elapsedRetreat > retreatDuration + 1800) && !goombaJumpTriggered) {
-                    goombaJumpTriggered = true;
+                } else if ((isEnemyClose(model) || elapsedRetreat > retreatDuration + 1800) && !enemyJumpTriggered) {
+                    enemyJumpTriggered = true;
                     postJumpStartTime = System.currentTimeMillis();
                     return new boolean[]{false, false, false, false, true}; // jump in place
-                } else if (goombaJumpTriggered && System.currentTimeMillis() - postJumpStartTime > 1000) {
-                    resetGoombaState();
+                } else if (enemyJumpTriggered && System.currentTimeMillis() - postJumpStartTime > 1000) {
+                    resetEnemyState();
                     return new boolean[]{false, true, false, true, false}; // resume running
                 } else if (elapsedRetreat > retreatDuration + 1800) {
-                    resetGoombaState();
+                    resetEnemyState();
                     return new boolean[]{false, true, false, true, false}; // resume running
                 } else {
                     return new boolean[]{false, false, false, false, false}; // wait
                 }
 
             case 2:
-                long elapsedBackJump = System.currentTimeMillis() - goombaStartTime;
+                long elapsedBackJump = System.currentTimeMillis() - enemyStartTime;
 
                 // Jump left
-                if (!goombaJumped) {
-                    goombaJumped = true;
-                    goombaStartTime = System.currentTimeMillis();
+                if (!enemyJumped) {
+                    enemyJumped = true;
+                    enemyStartTime = System.currentTimeMillis();
                     return new boolean[]{true, false, false, false, true}; // jump left
                 } else if (elapsedBackJump < 750 + 100) {
                     return new boolean[]{true, false, false, false, true}; // keep jumping left
@@ -140,8 +184,8 @@ public class Agent implements MarioAgent {
                 }
 
                 // Begin forward jump
-                else if (!goombaJumpTriggered) {
-                    goombaJumpTriggered = true;
+                else if (!enemyJumpTriggered) {
+                    enemyJumpTriggered = true;
                     return new boolean[]{false, true, false, false, true}; // jump right
                 } else if (elapsedBackJump < 1400) {
                     return new boolean[]{false, true, false, false, true}; // keep jumping right
@@ -149,17 +193,18 @@ public class Agent implements MarioAgent {
 
                 // Resume neutral
                 else {
-                    resetGoombaState();
+                    resetEnemyState();
                     return new boolean[]{false, true, false, false, false}; // walk right
                 }
 
             default:
-                resetGoombaState();
+                resetEnemyState();
                 return new boolean[]{false, true, false, false, false}; // fallback
         }
     }
 
-    private boolean isGoombaClose(MarioForwardModel model) {
+    // Helper: check if enemy is close
+    private boolean isEnemyClose(MarioForwardModel model) {
         float[] marioPos = model.getMarioFloatPos();
         float marioX = marioPos[0];
         float marioY = marioPos[1];
@@ -180,14 +225,15 @@ public class Agent implements MarioAgent {
         return false;
     }
 
-    private void resetGoombaState() {
+    // Helper: reset enemy state
+    private void resetEnemyState() {
         currentState = State.NEUTRAL;
-        neutralStartTime = System.currentTimeMillis();
-        isRunning = false;
-        goombaBehavior = -1;
-        goombaJumped = false;
+        enemyBehavior = -1;
+        enemyJumped = false;
+        enemyJumpTriggered = false;
     }
 
+    // Detect obstacles (walls, gaps, enemies) ahead of Mario
     private State detectObstacle(MarioForwardModel model) {
         int[][] scene = model.getMarioSceneObservation(1);
         int centerX = scene.length / 2;
@@ -196,20 +242,32 @@ public class Agent implements MarioAgent {
         float marioX = marioPos[0];
         float marioY = marioPos[1];
 
-        // Check for solid tiles, pipes, or ? blocks ahead
+        // Check for solid tiles, pipes, bricks, or other blocks ahead (not enemies)
+        boolean wallAhead = false;
         for (int dx = 1; dx <= 3; dx++) {
             int tile = scene[centerX + dx][centerY];
             if (tile == MarioForwardModel.OBS_PIPE ||
-                tile == MarioForwardModel.OBS_SOLID) { 
-                return State.STOPPED; // change this <---
+                tile == MarioForwardModel.OBS_SOLID ||
+                tile == MarioForwardModel.OBS_BRICK ||
+                tile == MarioForwardModel.OBS_QUESTION_BLOCK ||
+                tile == MarioForwardModel.OBS_PLATFORM ||
+                tile == MarioForwardModel.OBS_PLATFORM_SINGLE ||
+                tile == MarioForwardModel.OBS_PLATFORM_LEFT ||
+                tile == MarioForwardModel.OBS_PLATFORM_RIGHT ||
+                tile == MarioForwardModel.OBS_PLATFORM_CENTER) {
+                wallAhead = true;
             }
         }
-
-        // Check for ? block overhead
-        int overhead = scene[centerX + 1][centerY - 1];
-        if (overhead == MarioForwardModel.OBS_QUESTION_BLOCK) {
-            return State.STOPPED;
+        if (wallAhead) {
+            return State.HANDLE_WALL;
         }
+
+        /* We're ignoring question blocks */
+        // // Check for ? block overhead
+        // int overhead = scene[centerX + 1][centerY - 1];
+        // if (overhead == MarioForwardModel.OBS_QUESTION_BLOCK) {
+        //     return State.STOPPED;
+        // }
 
         // Check for enemies within a danger zone
         float[] enemies = model.getEnemiesFloatPos();
@@ -221,9 +279,9 @@ public class Agent implements MarioAgent {
             float dx = ex - marioX;
             float dy = ey - marioY;
 
-            if (dx > 0 && dx < 70 && Math.abs(dy) < 16) {
-                if (type == 2.0f) return State.HANDLE_GOOMBA;
-                if (type == 3.0f) return State.STOPPED; // placeholder for Koopas
+            // Generalize: handle all enemies (Goomba, Koopa, Spiky, etc.)
+            if (type >= 2.0f && type <= 11.0f && dx > 0 && dx < 70 && Math.abs(dy) < 16) {
+                return State.HANDLE_ENEMY;
             }
         }
 
