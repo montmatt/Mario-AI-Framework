@@ -1,3 +1,16 @@
+This is a forked repository of a Mario AI framework, created by amidos2006. The purpose of of this frameowork is for our own educational purposes only (for WPI's CS/IMGD 4100 class "Artificial Intelligence for Interactive Media and Games") to learn about and experiment with AI agents and behavior. Please use this following link of the original creator's full description and how-to guide for the framework: https://github.com/amidos2006/Mario-AI-Framework.
+
+<h3 id="features">Group Members</h3>
+
+------
+- Matthew Montero
+- Nicky Giangregorio
+------
+
+We didn't ask anyone for help outside our group, nor did we reference external sources other than the information provided by the source code provided in the original repository.
+
+the names of any people who helped you with the assignment, references to any external sources you used, a list of all the files you created for this assignment and their location, and complete instructions necessary for getting your code to work. And don’t forget to include the link to your video!
+
 <p align="center">
 <a href="#features">Features</a> &mdash; <a href="#use">How To Use</a> &mdash; <a href="#papers">Related Papers</a> &mdash; <a href="#missing">Missing Features</a> &mdash; <a href="#copyrights">Copyrights</a>
 </p>
