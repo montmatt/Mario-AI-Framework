@@ -9,10 +9,6 @@ This is a forked repository of a Mario AI framework, created by amidos2006. The 
 
 We didn't get anyone outside help our group, nor did we reference external sources other than the information provided by the source code provided in the original repository.
 
-The following 
-
-a list of all the files you created for this assignment and their location, and complete instructions necessary for getting your code to work. And don’t forget to include the link to your video!
-
 <h3 id="use">How To Use</h3>
 
 ------
