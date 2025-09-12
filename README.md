@@ -1,8 +1,6 @@
-<p align="center">
-<img width="300" height="300" alt="Macky Agent" src="https://www.youtube.com/watch?v=TFDOHPTQE6k&feature=youtu.be">
-</p>
-
 This is a forked repository of a Mario AI framework, created by amidos2006. The purpose of of this framework is for our own educational purposes only (for Prof. Gillian Smith's WPI CS/IMGD 4100 class "Artificial Intelligence for Interactive Media and Games") to learn about and experiment with AI agents and behavior. Please use this following link of the original creator's full description and how-to guide for the framework: https://github.com/amidos2006/Mario-AI-Framework.
+
+Our group has produced a [video](https://www.youtube.com/watch?v=TFDOHPTQE6k&feature=youtu.be) to showcase what our custom AI agent "Macky" can do! This video is up to date with code produced on September 11th, 2025.
 
 <h3 id="features">Group Members</h3>
 
