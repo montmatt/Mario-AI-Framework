@@ -16,7 +16,7 @@ We didn't receive anyone outside help for our group, nor did we reference extern
 ------
 For a full detailed instruction guide, please refer to amidos2006's readme file in their repository. The following are instructions based on their how-to use guide:
 
-Download this repo and run the [`PlayLevel.java`](https://github.com/montmatt/Mario-AI-Framework/blob/60b98a38574f407ac62012b58d0230119e1b48ce/src/PlayLevel.java) file in Visual Studio Code (VS Code). It will run our custom AI agent [`macky`](https://github.com/montmatt/Mario-AI-Framework/blob/60b98a38574f407ac62012b58d0230119e1b48ce/src/agents/macky/Agent.java). The game will run for 100 seconds (in-game time) and with Mario playing on the [third level](https://github.com/montmatt/Mario-AI-Framework/blob/master/levels/original/lvl-3.txt). To change the parameters of the game (such as the agent, level, or time), just change their values in the following code
+Download this repo and run the [`PlayLevel.java`](https://github.com/montmatt/Mario-AI-Framework/blob/60b98a38574f407ac62012b58d0230119e1b48ce/src/PlayLevel.java) file in Visual Studio Code (VS Code). It will run our custom AI agent [`macky`](https://github.com/montmatt/Mario-AI-Framework/blob/60b98a38574f407ac62012b58d0230119e1b48ce/src/agents/macky/Agent.java). The game will run for 100 seconds (in-game time) and with Mario playing on the [third level](https://github.com/montmatt/Mario-AI-Framework/blob/172c573b5d385794aadb0d78be2ed6258a084f72/levels/original/lvl-3.txt). To change the parameters of the game (such as the agent, level, or time), just change their values in the following code
 ```
 printResults(game.runGame(new agents.robinBaumgarten.Agent(), getLevel("levels/original/lvl-1.txt"), 100, 0, true));
 ```
